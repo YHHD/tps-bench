@@ -1,0 +1,27 @@
+{
+  "name": "tps-bench",
+  "version": "1.0.0",
+  "description": "Local LLM API benchmark: TTFT, decode TPS and end-to-end throughput over five streaming rounds.",
+  "type": "module",
+  "main": "opencode-proxy.mjs",
+  "scripts": {
+    "start": "node opencode-proxy.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "benchmark",
+    "llm",
+    "tps",
+    "ttft",
+    "openai",
+    "anthropic",
+    "cc-switch"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YHHD/tps-bench.git"
+  }
+}
