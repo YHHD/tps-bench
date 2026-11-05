@@ -4,6 +4,8 @@
 
 A local benchmark for LLM APIs: five streaming rounds measuring time-to-first-token (TTFT), decode TPS and end-to-end throughput, so you can compare providers and models on the same footing.
 
+![TPS Bench 界面](docs/screenshot.png)
+
 [中文](#中文) · [English](#english)
 
 ---
