@@ -1,8 +1,8 @@
 # TPS Bench
 
-本地 LLM API 测速台：连续发起 5 轮流式请求，测量首字延迟（TTFT）、解码速度（decode TPS）和端到端吞吐（E2E TPS），用来对比不同供应商和模型的真实响应速度。
+本地的 LLM API 测速台，也是 [CC Switch](https://github.com/farion1231/cc-switch) 的配套面板：连续发起 5 轮流式请求，测量首字延迟（TTFT）、解码速度（decode TPS）和端到端吞吐（E2E TPS），用来对比不同供应商和模型的真实响应速度。
 
-A local benchmark for LLM APIs: five streaming rounds measuring time-to-first-token (TTFT), decode TPS and end-to-end throughput, so you can compare providers and models on the same footing.
+A local LLM API benchmark and companion to [CC Switch](https://github.com/farion1231/cc-switch): five streaming rounds measuring time-to-first-token (TTFT), decode TPS and end-to-end throughput, so you can compare providers and models on the same footing.
 
 ![TPS Bench 界面](docs/screenshot.png)
 
@@ -14,6 +14,7 @@ A local benchmark for LLM APIs: five streaming rounds measuring time-to-first-to
 
 ### 功能
 
+- **CC Switch 配套**：直接读取 CC Switch 已保存的供应商、模型和凭据，默认即 `cc-switch` 协议
 - 5 轮基准测试，逐轮记录 TTFT、decode TPS、E2E TPS、总耗时、输入/输出 token
 - 统计 p50 / p95 / min / max、成功率、与基线的对比
 - 供应商排行榜（谁更快）和趋势图
@@ -28,7 +29,17 @@ A local benchmark for LLM APIs: five streaming rounds measuring time-to-first-to
 | --- | --- |
 | Node.js | >= 18 |
 | sqlite3 | macOS 自带；Linux 需自行安装（仅 CC Switch 模式需要） |
-| CC Switch | 仅 `cc-switch` 协议需要，本机安装并运行 |
+| CC Switch | 推荐搭配；`cc-switch` 协议需要本机安装并运行 |
+
+### 与 CC Switch 的关系
+
+TPS Bench 是 [CC Switch](https://github.com/farion1231/cc-switch) 的配套测速面板。CC Switch 负责保存和切换 Claude Code / Codex 的供应商配置；TPS Bench 不重复维护这些配置，而是直接读取 CC Switch 数据库里的供应商、Base URL、模型目录和凭据，把同一套配置拿来实测。
+
+- **默认接入方式**就是 `cc-switch`：打开页面时，供应商和模型下拉框直接来自 CC Switch 的 Claude Code / Codex 配置。
+- **只读**：代理只执行 `SELECT`，不会修改 CC Switch 的供应商、当前配置或数据库文件。
+- **凭据不外泄**：Base URL 和 Key 只在本地代理进程内使用，不返回浏览器、不写日志。
+- **需要 CC Switch 在本机运行**：默认本地路由为 `http://127.0.0.1:15721`（`CC_SWITCH_ORIGIN` 可改），数据库默认 `~/.cc-switch/cc-switch.db`（`CC_SWITCH_DB` 可改）。
+- **不依赖 CC Switch 也能用**：切到 OpenCode Go、Anthropic 或 OpenAI 兼容协议，手动填写 Base URL 和 Key 即可。
 
 ### 快速开始
 
@@ -112,6 +123,7 @@ tps-bench/
 
 ### Features
 
+- **Built for CC Switch**: reads the providers, models and credentials already stored in CC Switch; `cc-switch` is the default protocol
 - Five benchmark rounds recording TTFT, decode TPS, E2E TPS, total time and token usage
 - p50 / p95 / min / max, success rate and baseline comparison
 - Provider leaderboard and per-run trend charts
@@ -128,7 +140,17 @@ The UI is in Chinese (labels such as 协议 = protocol, 供应商 = provider, �
 | --- | --- |
 | Node.js | >= 18 |
 | sqlite3 | Bundled with macOS; install separately on Linux (CC Switch mode only) |
-| CC Switch | Required only for the `cc-switch` mode; must be installed and running |
+| CC Switch | Recommended; required for the `cc-switch` mode and must be running locally |
+
+### Relationship to CC Switch
+
+TPS Bench is the benchmarking companion for [CC Switch](https://github.com/farion1231/cc-switch). CC Switch stores and switches provider configurations for Claude Code / Codex; TPS Bench does not keep a second copy — it reads the providers, base URLs, model catalogs and credentials already in CC Switch and benchmarks exactly those configurations.
+
+- **`cc-switch` is the default mode**: on load, the provider and model dropdowns come straight from CC Switch's Claude Code / Codex entries.
+- **Read-only**: the proxy only runs `SELECT` queries; it never changes CC Switch's providers, active configuration or database file.
+- **Credentials stay local**: base URLs and keys are used only inside the local proxy process; they are never returned to the browser or written to logs.
+- **CC Switch must be running locally**: the default router is `http://127.0.0.1:15721` (override with `CC_SWITCH_ORIGIN`); the database defaults to `~/.cc-switch/cc-switch.db` (override with `CC_SWITCH_DB`).
+- **CC Switch is optional**: the OpenCode Go, Anthropic and OpenAI-compatible modes work with a manually entered base URL and key.
 
 ### Quick start
 
