@@ -25,12 +25,10 @@ const pagePath = join(here, "tps-bench.html");
 const basecoatPath = join(here, "basecoat.css");
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
-const OPENCODE_UPSTREAM = process.env.OPENCODE_UPSTREAM || "https://opencode.ai/inference/go/openai/v1/chat/completions";
 const ANTHROPIC_UPSTREAM = process.env.ANTHROPIC_UPSTREAM || "https://api.anthropic.com/v1/messages";
 const CC_SWITCH_ORIGIN = process.env.CC_SWITCH_ORIGIN || "http://127.0.0.1:15721";
 const CC_SWITCH_DB = process.env.CC_SWITCH_DB || join(homedir(), ".cc-switch", "cc-switch.db");
 const USER_AGENT = process.env.TPS_BENCH_UA || "tps-bench/1.0";
-const fallbackSession = `ses_${randomBytes(13).toString("hex")}`;
 const allowedCcOrigins = new Set([`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`]);
 const RUN_TTL_MS = 30 * 60 * 1000;
 const MAX_RUNS = 32;
@@ -53,8 +51,8 @@ const ccCorsHeaders = {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
-  "Access-Control-Allow-Headers": "authorization, content-type, accept, x-opencode-session, x-bench-session, x-api-key, anthropic-version, anthropic-beta, anthropic-dangerous-direct-browser-access",
-  "Access-Control-Expose-Headers": "x-opencode-session, request-id, anthropic-ratelimit-requests-remaining, anthropic-ratelimit-tokens-remaining",
+  "Access-Control-Allow-Headers": "authorization, content-type, accept, x-api-key, anthropic-version, anthropic-beta, anthropic-dangerous-direct-browser-access",
+  "Access-Control-Expose-Headers": "request-id, anthropic-ratelimit-requests-remaining, anthropic-ratelimit-tokens-remaining",
   "Access-Control-Max-Age": "86400"
 };
 
@@ -92,13 +90,6 @@ async function readJsonBody(req, limit = 256 * 1024) {
   } catch (_) {
     throw Object.assign(new Error("请求体必须是 JSON。"), { statusCode: 400 });
   }
-}
-
-function sessionFrom(req) {
-  const supplied = req.headers["x-opencode-session"] || req.headers["x-bench-session"];
-  const session = Array.isArray(supplied) ? supplied[0] : supplied;
-  if (!session) return fallbackSession;
-  return String(session).trim() || fallbackSession;
 }
 
 async function servePage(res) {
@@ -601,7 +592,6 @@ async function proxyRequest(req, res, upstreamUrl, kind) {
     const auth = req.headers.authorization || "";
     const isAnthropic = kind === "anthropic";
     const isCcSwitch = kind === "cc-switch";
-    const session = isAnthropic || isCcSwitch ? null : sessionFrom(req);
 
     const headers = {
       Accept: "text/event-stream",
@@ -620,8 +610,6 @@ async function proxyRequest(req, res, upstreamUrl, kind) {
       if (req.headers["anthropic-dangerous-direct-browser-access"]) {
         headers["anthropic-dangerous-direct-browser-access"] = req.headers["anthropic-dangerous-direct-browser-access"];
       }
-    } else {
-      headers["x-opencode-session"] = session;
     }
 
     const responseCors = isCcSwitch ? ccCorsHeaders : corsHeaders;
@@ -639,7 +627,6 @@ async function proxyRequest(req, res, upstreamUrl, kind) {
       "Cache-Control": "no-cache, no-transform",
       "X-Accel-Buffering": "no"
     };
-    if (session) responseHeaders["X-OpenCode-Session"] = session;
     if (upstream.headers.get("request-id")) responseHeaders["request-id"] = upstream.headers.get("request-id");
     if (upstream.headers.get("anthropic-ratelimit-requests-remaining")) {
       responseHeaders["anthropic-ratelimit-requests-remaining"] = upstream.headers.get("anthropic-ratelimit-requests-remaining");
@@ -760,11 +747,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === "POST" && (pathname === "/v1/chat/completions" || pathname === "/api/v1/chat/completions")) {
-    await proxyRequest(req, res, OPENCODE_UPSTREAM, "opencode");
-    return;
-  }
-
   if (req.method === "POST" && (pathname === "/v1/messages" || pathname === "/api/v1/messages")) {
     await proxyRequest(req, res, ANTHROPIC_UPSTREAM, "anthropic");
     return;
@@ -780,7 +762,6 @@ server.on("error", (error) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`TPS Bench: http://${HOST}:${PORT}/`);
-  console.log(`OpenCode upstream: ${OPENCODE_UPSTREAM}`);
   console.log(`Anthropic upstream: ${ANTHROPIC_UPSTREAM}`);
   console.log(`CC Switch DB (read-only): ${CC_SWITCH_DB}`);
   console.log("CC Switch credentials stay in the local proxy and are never logged.");

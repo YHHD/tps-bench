@@ -173,8 +173,6 @@
     .advanced-body { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; padding-top: 10px; }
     .check-row { display: flex; align-items: center; gap: 7px; color: var(--tb-muted); font-size: 12px; }
     .check-row input { accent-color: var(--tb-accent); }
-    .session-row { display: flex; gap: 6px; }
-    .session-row .control { min-width: 0; }
     .proxy-hint { display: none; border: 1px solid rgba(114,184,255,.22); background: rgba(114,184,255,.055); color: var(--tb-muted); border-radius: 8px; padding: 8px 9px; font-size: 12px; }
     .proxy-hint.show { display: block; }
     .proxy-hint code { color: var(--blue); font-family: var(--mono); }
@@ -506,7 +504,6 @@
               <option value="cc-switch">CC Switch</option>
               <option value="openai">OpenAI 兼容</option>
               <option value="anthropic">Anthropic</option>
-              <option value="opencode-go">OpenCode Go</option>
             </select>
           </label>
           <label class="field field-url" id="baseUrlField"><span class="field-label">Base URL</span><input class="control input" id="baseUrl" name="baseUrl" type="url" spellcheck="false" placeholder="https://api.example.com/v1" autocomplete="url"></label>
@@ -541,8 +538,6 @@
               <div class="advanced-body">
                 <label class="field"><span class="field-label">轮间间隔 / ms</span><input class="control input" id="delayMs" name="delayMs" type="number" min="0" step="50" value="250"></label>
                 <label class="check-row"><input class="input" id="includeUsage" type="checkbox" checked><span>请求流式 usage</span></label>
-                <label class="check-row" id="sessionToggleRow"><input class="input" id="sendSession" type="checkbox"><span><code>x-opencode-session</code></span></label>
-                <div class="field hidden" id="sessionField"><span class="field-label">Session ID</span><div class="session-row"><input class="control input" id="sessionId" type="text" spellcheck="false" placeholder="ses_..."><button class="btn" id="sessionGenerate" data-variant="outline" data-size="sm" type="button">生成</button></div></div>
               </div>
             </details>
             <div class="proxy-hint" id="proxyHint">运行 <code>opencode-proxy.mjs</code>，Base URL 填 <code>http://127.0.0.1:8787</code>。</div>
@@ -659,7 +654,7 @@
         <div class="dialog-body">
           <div class="history-empty" id="historyEmpty">还没有历史记录</div>
           <div class="table-container table-wrap history-wrap hidden" id="historyTableWrap">
-            <table class="table history-table"><thead><tr><th>时间</th><th>应用</th><th>供应商</th><th>模型</th><th>成功</th><th>首字延迟</th><th>生成速度</th><th>整体速度</th><th>Session</th><th>操作</th></tr></thead><tbody id="historyBody"></tbody></table>
+            <table class="table history-table"><thead><tr><th>时间</th><th>应用</th><th>供应商</th><th>模型</th><th>成功</th><th>首字延迟</th><th>生成速度</th><th>整体速度</th><th>操作</th></tr></thead><tbody id="historyBody"></tbody></table>
           </div>
         </div>
       </div>
@@ -713,11 +708,6 @@
         tokenParam: $("#tokenParam"),
         delayMs: $("#delayMs"),
         includeUsage: $("#includeUsage"),
-        sendSession: $("#sendSession"),
-        sessionField: $("#sessionField"),
-        sessionId: $("#sessionId"),
-        sessionGenerate: $("#sessionGenerate"),
-        sessionToggleRow: $("#sessionToggleRow"),
         proxyHint: $("#proxyHint"),
         configDrawer: $("#configDrawer"),
         baseUrlField: $("#baseUrlField"),
@@ -818,7 +808,6 @@
         config: null,
         lastOutput: "",
         lastReasoning: "",
-        sessionId: "",
         startedAt: null,
         lastProtocol: "openai",
         ccPreviousConfig: null,
@@ -840,8 +829,8 @@
       function loadConfig() {
         let saved = {};
         try { saved = JSON.parse(localStorage.getItem(CONFIG_KEY) || "{}") || {}; } catch (_) {}
-        els.protocol.value = ["anthropic", "opencode-go", "cc-switch", "openai"].includes(saved.protocol) ? saved.protocol : "cc-switch";
-        const defaultBase = els.protocol.value === "opencode-go" ? "http://127.0.0.1:8787" : els.protocol.value === "cc-switch" ? CC_SWITCH_PROXY_BASE : "https://api.openai.com";
+        els.protocol.value = ["anthropic", "cc-switch", "openai"].includes(saved.protocol) ? saved.protocol : "cc-switch";
+        const defaultBase = els.protocol.value === "cc-switch" ? CC_SWITCH_PROXY_BASE : "https://api.openai.com";
         els.baseUrl.value = typeof saved.baseUrl === "string" && saved.baseUrl ? saved.baseUrl : defaultBase;
         state.lastProtocol = els.protocol.value;
         els.model.value = typeof saved.model === "string" ? saved.model : "";
@@ -861,8 +850,6 @@
         els.tokenParam.value = saved.tokenParam === "max_completion_tokens" ? "max_completion_tokens" : "max_tokens";
         els.delayMs.value = Number.isFinite(Number(saved.delayMs)) ? Math.max(0, Number(saved.delayMs)) : 250;
         els.includeUsage.checked = saved.includeUsage !== false;
-        els.sendSession.checked = saved.sendSession === true;
-        els.sessionId.value = typeof saved.sessionId === "string" ? saved.sessionId : "";
         updateProtocolUI();
         updateEndpointPreview();
         saveConfig();
@@ -1038,9 +1025,7 @@
           timeoutSec: Number(els.timeoutSec.value) || 120,
           tokenParam: els.tokenParam.value,
           delayMs: Number(els.delayMs.value) || 0,
-          includeUsage: els.includeUsage.checked,
-          sendSession: els.sendSession.checked,
-          sessionId: els.sessionId.value.trim()
+          includeUsage: els.includeUsage.checked
         };
         if (ccSwitch) {
           state.savedCcSelection = {
@@ -1115,23 +1100,15 @@
 
       function updateProtocolUI() {
         const anthropic = els.protocol.value === "anthropic";
-        const openCode = els.protocol.value === "opencode-go";
         const ccSwitch = els.protocol.value === "cc-switch";
         const base = els.baseUrl.value.trim();
         const freeModelField = els.model.closest(".field-model");
         els.setupGrid.classList.toggle("cc-mode", ccSwitch);
         els.endpointRow?.classList.toggle("hidden", ccSwitch);
-        if (openCode || anthropic) els.configDrawer.open = true;
-        if (openCode && /^https:\/\/opencode\.ai\//i.test(base)) {
-          els.baseUrl.value = "http://127.0.0.1:8787";
-        }
+        if (anthropic) els.configDrawer.open = true;
         if (anthropic && /^https:\/\/api\.anthropic\.com(\/|$)/i.test(base)) {
           els.baseUrl.value = "http://127.0.0.1:8787";
         }
-        els.sendSession.checked = openCode;
-        els.sessionToggleRow.classList.toggle("hidden", !openCode);
-        els.sendSession.disabled = !openCode;
-        els.sessionField.classList.toggle("hidden", !els.sendSession.checked);
 
         if (ccSwitch) {
           els.baseUrlField.classList.add("hidden");
@@ -1161,17 +1138,14 @@
           }
         }
 
-        if (openCode) {
-          els.proxyHint.innerHTML = '运行 <code>opencode-proxy.mjs</code> · Base URL <code>http://127.0.0.1:8787</code>';
-          els.proxyHint.classList.add("show");
-        } else if (anthropic) {
+        if (anthropic) {
           els.proxyHint.innerHTML = '本地代理 <code>http://127.0.0.1:8787</code>';
           els.proxyHint.classList.add("show");
         } else {
           els.proxyHint.classList.remove("show");
         }
-        els.tokenParam.disabled = anthropic || openCode || ccSwitch;
-        if (anthropic || openCode || ccSwitch) els.tokenParam.value = "max_tokens";
+        els.tokenParam.disabled = anthropic || ccSwitch;
+        if (anthropic || ccSwitch) els.tokenParam.value = "max_tokens";
         els.includeUsage.disabled = anthropic || ccSwitch;
         els.includeUsage.parentElement.style.opacity = anthropic || ccSwitch ? ".48" : "1";
         updateEndpointPreview();
@@ -1263,8 +1237,6 @@
           tokenParam: protocol === "anthropic" || ccSwitch ? "max_tokens" : els.tokenParam.value,
           delayMs: Math.max(0, Number(els.delayMs.value) || 0),
           includeUsage: els.includeUsage.checked,
-          sendSession: protocol === "opencode-go" || els.sendSession.checked,
-          sessionId: els.sessionId.value.trim(),
           stream: true
         };
         cfg.endpointLabel = ccSwitch ? ccEndpointLabelFromConfig(cfg) : buildEndpoint(cfg.baseUrl, cfg.protocol);
@@ -1289,7 +1261,6 @@
         if (!cfg.baseUrl) return "请填写 API Base URL。";
         if (!cfg.apiKey) return "请填写 API Key；建议使用临时低额度 Key。";
         if (!cfg.model) return "请填写模型 ID。";
-        if (cfg.sendSession && cfg.sessionId && !cfg.sessionId.startsWith("ses_")) return "Session ID 应以 ses_ 开头；留空会自动生成。";
         try {
           const parsed = new URL(buildEndpoint(cfg.baseUrl, cfg.protocol));
           if (!/^https?:$/.test(parsed.protocol)) return "Base URL 只支持 http/https。";
@@ -1303,7 +1274,6 @@
         state.running = running;
         const fields = $$("#configForm input, #configForm select, #configForm textarea");
         for (const field of fields) field.disabled = running;
-        els.sessionGenerate.disabled = running;
         if (!running) updateProtocolUI();
         els.startBtn.disabled = running;
         els.startBtn.classList.toggle("hidden", running);
@@ -1673,13 +1643,6 @@
         };
       }
 
-      function makeSessionId() {
-        const id = typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID().replace(/-/g, "").slice(0, 26)
-          : Math.random().toString(16).slice(2).padEnd(26, "0").slice(0, 26);
-        return `ses_${id}`;
-      }
-
       function makeRunId() {
         const id = typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID().replace(/-/g, "")
@@ -1737,9 +1700,6 @@
               headers["anthropic-dangerous-direct-browser-access"] = "true";
             } else {
               headers["Authorization"] = `Bearer ${cfg.apiKey}`;
-              if (cfg.sendSession && state.sessionId) {
-                headers["x-opencode-session"] = state.sessionId;
-              }
             }
             body = cfg.protocol === "anthropic"
               ? {
@@ -2474,17 +2434,14 @@
         const cfg = state.config;
         const protocolLabel = cfg.protocol === "anthropic"
           ? "Anthropic Messages"
-          : cfg.protocol === "opencode-go"
-            ? "OpenCode Go / proxy"
-            : cfg.protocol === "cc-switch"
-              ? "CC Switch"
-              : "OpenAI Chat Completions";
+          : cfg.protocol === "cc-switch"
+            ? "CC Switch"
+            : "OpenAI Chat Completions";
         const selectedConfig = cfg.protocol === "cc-switch"
           ? [ccAppName(cfg.appType), cfg.providerName].filter(Boolean).join(" / ")
           : "";
         const parts = [selectedConfig || protocolLabel, cfg.model, `${ROUNDS} rounds`, "stream=true", `max=${cfg.maxTokens}`];
         if (cfg.protocol === "cc-switch" && cfg.ccApiFormat) parts.push(cfg.ccApiFormat);
-        if (state.sessionId) parts.push(`session=${state.sessionId.slice(0, 16)}…`);
         els.metaBar.innerHTML = parts.map((part) => `<span>${escapeHtml(part)}</span>`).join("");
       }
 
@@ -2531,7 +2488,6 @@
 
       function protocolLabel(protocol) {
         if (protocol === "anthropic") return "Anthropic Messages";
-        if (protocol === "opencode-go") return "OpenCode Go / proxy";
         if (protocol === "cc-switch") return "CC Switch";
         return "OpenAI Chat Completions";
       }
@@ -2562,7 +2518,6 @@
         return {
           id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
           createdAt: new Date().toISOString(),
-          sessionId: state.sessionId || state.config?.sessionId || null,
           config: withoutKey(state.config),
           results: state.results.map((row) => ({
             ...row,
@@ -2646,8 +2601,6 @@
         els.historyBody.innerHTML = history.map((record) => {
           const success = record.summary?.success ?? record.results.filter((row) => row.ok).length;
           const total = record.summary?.total ?? record.results.length;
-          const session = record.sessionId || record.config?.sessionId || "";
-          const sessionLabel = session ? `${escapeHtml(session.slice(0, 16))}…` : "—";
           return `
             <tr>
               <td class="history-time" title="${escapeAttr(historyTime(record))}">${escapeHtml(historyRelTime(record))}</td>
@@ -2658,7 +2611,6 @@
               <td>${historyMetric(record, "ttft")}</td>
               <td>${historyMetric(record, "decodeTps")}</td>
               <td>${historyMetric(record, "e2eTps")}</td>
-              <td>${sessionLabel}</td>
               <td>
                 <span class="history-actions">
                   <button class="btn" data-variant="outline" data-size="sm" type="button" data-history-action="view" data-history-id="${escapeAttr(record.id)}">查看</button>
@@ -2686,7 +2638,7 @@
         if (!record?.config) return;
         const cfg = record.config;
         const ccSwitch = cfg.protocol === "cc-switch";
-        els.protocol.value = ["anthropic", "opencode-go", "cc-switch"].includes(cfg.protocol) ? cfg.protocol : "openai";
+        els.protocol.value = ["anthropic", "cc-switch"].includes(cfg.protocol) ? cfg.protocol : "openai";
         if (ccSwitch) {
           state.savedCcSelection = {
             appType: cfg.appType || "",
@@ -2705,9 +2657,6 @@
         els.tokenParam.value = cfg.tokenParam || "max_tokens";
         els.delayMs.value = Number.isFinite(Number(cfg.delayMs)) ? cfg.delayMs : 250;
         els.includeUsage.checked = cfg.includeUsage !== false;
-        els.sendSession.checked = cfg.sendSession === true;
-        // Do not carry the previous session into a fresh test.
-        els.sessionId.value = "";
         updateProtocolUI();
         if (ccSwitch) {
           const loaded = await loadCcCatalog();
@@ -2761,9 +2710,7 @@
         }
         showValidation("");
         if (els.configDrawer) els.configDrawer.open = false;
-        state.sessionId = cfg.sendSession ? (cfg.sessionId || makeSessionId()) : "";
         state.config = withoutKey(cfg);
-        state.config.sessionId = state.sessionId || null;
         state.results = [];
         state.stopNote = "";
         state.startedAt = new Date().toISOString();
@@ -2852,7 +2799,6 @@
         if (state.running) return;
         state.results = [];
         state.config = null;
-        state.sessionId = "";
         state.lastOutput = "";
         state.lastReasoning = "";
         state.stopNote = "";
@@ -2873,11 +2819,11 @@
       function exportCsv() {
         if (!state.results.length) return;
         const cfg = state.config || {};
-        const header = ["round","app_type","provider_name","model","session_id","status","sample_reliable","http_status","ttft_ms","decode_tps","e2e_tps","total_ms","output_tokens","input_tokens","token_source","stream","error_type","error"];
+        const header = ["round","app_type","provider_name","model","status","sample_reliable","http_status","ttft_ms","decode_tps","e2e_tps","total_ms","output_tokens","input_tokens","token_source","stream","error_type","error"];
         const lines = [header.join(",")];
         for (const r of state.results) {
           lines.push([
-            r.round, cfg.appType || cfg.protocol || "", cfg.providerName || "", cfg.model || r.model || "", state.sessionId || "", r.ok ? "ok" : "error", isReliableSample(r) ? "yes" : "no", r.httpStatus ?? "", r.ttftMs ?? "", r.decodeTps ?? "", r.e2eTps ?? "", r.totalMs ?? "", r.outputTokens ?? "", r.inputTokens ?? "", r.tokenSource, r.stream === null ? "" : r.stream, r.errorType, r.error
+            r.round, cfg.appType || cfg.protocol || "", cfg.providerName || "", cfg.model || r.model || "", r.ok ? "ok" : "error", isReliableSample(r) ? "yes" : "no", r.httpStatus ?? "", r.ttftMs ?? "", r.decodeTps ?? "", r.e2eTps ?? "", r.totalMs ?? "", r.outputTokens ?? "", r.inputTokens ?? "", r.tokenSource, r.stream === null ? "" : r.stream, r.errorType, r.error
           ].map(csvEscape).join(","));
         }
         const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -2935,15 +2881,11 @@
         });
         els.protocol.addEventListener("change", () => {
           const nextProtocol = els.protocol.value;
-          const openCode = nextProtocol === "opencode-go";
           if (nextProtocol === "cc-switch" && state.lastProtocol !== "cc-switch") {
             state.ccPreviousConfig = { baseUrl: els.baseUrl.value, model: els.model.value };
           }
           state.lastProtocol = nextProtocol;
-          if (!openCode && nextProtocol !== "anthropic" && nextProtocol !== "cc-switch") els.configDrawer.open = false;
-          if (openCode && (!els.baseUrl.value.trim() || els.baseUrl.value === "https://api.openai.com")) {
-            els.baseUrl.value = "http://127.0.0.1:8787";
-          }
+          if (nextProtocol !== "anthropic" && nextProtocol !== "cc-switch") els.configDrawer.open = false;
           updateProtocolUI();
           saveConfig();
         });
@@ -2963,16 +2905,7 @@
           updateEndpointPreview();
         });
         els.ccRefreshBtn.addEventListener("click", () => loadCcCatalog(true));
-        els.sendSession.addEventListener("change", () => {
-          els.sessionField.classList.toggle("hidden", !els.sendSession.checked);
-          saveConfig();
-        });
-        els.sessionGenerate.addEventListener("click", () => {
-          els.sessionId.value = makeSessionId();
-          els.sessionField.classList.remove("hidden");
-          saveConfig();
-        });
-        for (const el of [els.baseUrl, els.model, els.prompt, els.maxTokens, els.timeoutSec, els.tokenParam, els.delayMs, els.includeUsage, els.sessionId]) {
+        for (const el of [els.baseUrl, els.model, els.prompt, els.maxTokens, els.timeoutSec, els.tokenParam, els.delayMs, els.includeUsage]) {
           el.addEventListener("input", () => { updateEndpointPreview(); saveConfig(); });
           el.addEventListener("change", () => { updateEndpointPreview(); saveConfig(); });
         }

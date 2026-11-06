@@ -19,7 +19,7 @@ A local LLM API benchmark and companion to [CC Switch](https://github.com/farion
 - 统计 p50 / p95 / min / max、成功率、与基线的对比
 - 供应商排行榜（谁更快）和趋势图
 - 历史记录保存在浏览器 localStorage，可回看、删除
-- 四种接入方式：CC Switch（默认）、OpenCode Go、Anthropic、OpenAI 兼容
+- 三种接入方式：CC Switch（默认）、Anthropic、OpenAI 兼容
 - 明暗主题、流式输出、桌面与移动端自适应
 - 零 npm 依赖，单页应用 + 本地 Node 代理
 
@@ -39,7 +39,7 @@ TPS Bench 是 [CC Switch](https://github.com/farion1231/cc-switch) 的配套测�
 - **只读**：代理只执行 `SELECT`，不会修改 CC Switch 的供应商、当前配置或数据库文件。
 - **凭据不外泄**：Base URL 和 Key 只在本地代理进程内使用，不返回浏览器、不写日志。
 - **需要 CC Switch 在本机运行**：默认本地路由为 `http://127.0.0.1:15721`（`CC_SWITCH_ORIGIN` 可改），数据库默认 `~/.cc-switch/cc-switch.db`（`CC_SWITCH_DB` 可改）。
-- **不依赖 CC Switch 也能用**：切到 OpenCode Go、Anthropic 或 OpenAI 兼容协议，手动填写 Base URL 和 Key 即可。
+- **不依赖 CC Switch 也能用**：切到 Anthropic 或 OpenAI 兼容协议，手动填写 Base URL 和 Key 即可。
 
 ### 快速开始
 
@@ -56,7 +56,6 @@ npm start
 | 协议 | 请求路径 | 说明 |
 | --- | --- | --- |
 | `cc-switch` | 浏览器 → 本地代理 → CC Switch 本地路由 | 代理以只读方式打开 `~/.cc-switch/cc-switch.db`，读取供应商的 Base URL、模型目录和凭据；凭据只在代理进程内使用，不返回浏览器、不写日志 |
-| `opencode-go` | 浏览器 → 本地代理 → `OPENCODE_UPSTREAM` | 默认上游为 `https://opencode.ai/inference/go/openai/v1/chat/completions`，可附带 `x-opencode-session` |
 | `anthropic` | 浏览器 → 本地代理 → `ANTHROPIC_UPSTREAM` | Base URL 填 `https://api.anthropic.com` 时页面会自动改用本地代理，由代理转发 |
 | `openai` | 浏览器直连你填写的 Base URL | 上游必须允许 CORS；API Key 只保存在浏览器中 |
 
@@ -70,7 +69,6 @@ CC Switch 模式下，只有同时具备 Base URL、已存 API Key 和模型目�
 | `HOST` | `127.0.0.1` | 监听地址 |
 | `CC_SWITCH_ORIGIN` | `http://127.0.0.1:15721` | CC Switch 本地路由地址 |
 | `CC_SWITCH_DB` | `~/.cc-switch/cc-switch.db` | CC Switch 数据库路径 |
-| `OPENCODE_UPSTREAM` | `https://opencode.ai/inference/go/openai/v1/chat/completions` | `opencode-go` 协议的上游 |
 | `ANTHROPIC_UPSTREAM` | `https://api.anthropic.com/v1/messages` | `anthropic` 协议的上游 |
 | `TPS_BENCH_UA` | `tps-bench/1.0` | 请求使用的 User-Agent |
 
@@ -128,7 +126,7 @@ tps-bench/
 - p50 / p95 / min / max, success rate and baseline comparison
 - Provider leaderboard and per-run trend charts
 - Run history stored in browser localStorage
-- Four connection modes: CC Switch (default), OpenCode Go, Anthropic and OpenAI-compatible
+- Three connection modes: CC Switch (default), Anthropic and OpenAI-compatible
 - Light/dark themes, streaming output, responsive layout
 - Zero npm dependencies: a single-page app plus a small local Node proxy
 
@@ -150,7 +148,7 @@ TPS Bench is the benchmarking companion for [CC Switch](https://github.com/fario
 - **Read-only**: the proxy only runs `SELECT` queries; it never changes CC Switch's providers, active configuration or database file.
 - **Credentials stay local**: base URLs and keys are used only inside the local proxy process; they are never returned to the browser or written to logs.
 - **CC Switch must be running locally**: the default router is `http://127.0.0.1:15721` (override with `CC_SWITCH_ORIGIN`); the database defaults to `~/.cc-switch/cc-switch.db` (override with `CC_SWITCH_DB`).
-- **CC Switch is optional**: the OpenCode Go, Anthropic and OpenAI-compatible modes work with a manually entered base URL and key.
+- **CC Switch is optional**: the Anthropic and OpenAI-compatible modes work with a manually entered base URL and key.
 
 ### Quick start
 
@@ -167,7 +165,6 @@ Open <http://127.0.0.1:8787/>, pick a protocol and run a benchmark. No `npm inst
 | Protocol | Path | Notes |
 | --- | --- | --- |
 | `cc-switch` | browser → local proxy → CC Switch router | The proxy opens `~/.cc-switch/cc-switch.db` read-only to read each provider's base URL, model catalog and credentials. Credentials stay in the proxy process and are never returned to the browser or logged |
-| `opencode-go` | browser → local proxy → `OPENCODE_UPSTREAM` | Defaults to `https://opencode.ai/inference/go/openai/v1/chat/completions`; optionally sends `x-opencode-session` |
 | `anthropic` | browser → local proxy → `ANTHROPIC_UPSTREAM` | When the base URL is `https://api.anthropic.com`, the page switches to the local proxy automatically |
 | `openai` | browser → your base URL directly | The upstream must allow CORS; the API key only lives in the browser |
 
@@ -181,7 +178,6 @@ In CC Switch mode, a provider is testable only when it has a base URL, a stored 
 | `HOST` | `127.0.0.1` | Bind address |
 | `CC_SWITCH_ORIGIN` | `http://127.0.0.1:15721` | CC Switch local router |
 | `CC_SWITCH_DB` | `~/.cc-switch/cc-switch.db` | CC Switch database path |
-| `OPENCODE_UPSTREAM` | `https://opencode.ai/inference/go/openai/v1/chat/completions` | Upstream for `opencode-go` |
 | `ANTHROPIC_UPSTREAM` | `https://api.anthropic.com/v1/messages` | Upstream for `anthropic` |
 | `TPS_BENCH_UA` | `tps-bench/1.0` | User-Agent sent upstream |
 
