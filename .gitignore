@@ -6,3 +6,8 @@ node_modules/
 coverage/
 .vscode/
 .idea/
+
+# Local tooling
+.claude/
+.mcp.json
+.playwright-mcp/
