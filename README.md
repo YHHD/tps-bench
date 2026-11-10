@@ -1,8 +1,10 @@
-# TPS Bench
+# TPS Bench — LLM API 测速与 TTFT / TPS Benchmark
 
 本地的 LLM API 测速台，也是 [CC Switch](https://github.com/farion1231/cc-switch) 的配套面板：连续发起 5 轮流式请求，测量首字延迟（TTFT）、解码速度（decode TPS）和端到端吞吐（E2E TPS），用来对比不同供应商和模型的真实响应速度。
 
 A local LLM API benchmark and companion to [CC Switch](https://github.com/farion1231/cc-switch): five streaming rounds measuring time-to-first-token (TTFT), decode TPS and end-to-end throughput, so you can compare providers and models on the same footing.
+
+[在线介绍页](https://yhhd.github.io/tps-bench/) · [GitHub 仓库](https://github.com/YHHD/tps-bench)
 
 ![TPS Bench 界面](docs/screenshot.png)
 

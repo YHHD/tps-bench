@@ -2,6 +2,7 @@
   "name": "tps-bench",
   "version": "1.0.0",
   "description": "Local LLM API benchmark: TTFT, decode TPS and end-to-end throughput over five streaming rounds.",
+  "homepage": "https://yhhd.github.io/tps-bench/",
   "type": "module",
   "main": "opencode-proxy.mjs",
   "scripts": {
