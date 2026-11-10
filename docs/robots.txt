@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://yhhd.github.io/tps-bench/sitemap.xml
+Sitemap: https://yhhd.github.io/tps-bench/sitemap.txt
